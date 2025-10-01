@@ -1,6 +1,10 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
@@ -11,8 +15,6 @@ import messageRoutes from './routes/messages';
 import callRoutes from './routes/calls';
 import fileRoutes from './routes/files';
 import folderRoutes from './routes/folders';
-
-dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
