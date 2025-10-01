@@ -78,6 +78,7 @@ export default function Home() {
   const [showFoldersModal, setShowFoldersModal] = useState(false)
   const [selectedFolder, setSelectedFolder] = useState<ChatFolder | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [messagesCache, setMessagesCache] = useState<Record<string, Message[]>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<Contact | null>(null)
@@ -708,6 +709,22 @@ export default function Home() {
 
   const handleSendMessage = async (message: Message) => {
     try {
+      // ОПТИМИСТИЧНОЕ ОБНОВЛЕНИЕ: добавляем сообщение в UI сразу
+      const optimisticMessage = {
+        ...message,
+        id: `temp_${Date.now()}`,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, optimisticMessage])
+      
+      // Обновляем кеш
+      if (message.chatId) {
+        setMessagesCache((prev) => ({
+          ...prev,
+          [message.chatId]: [...(prev[message.chatId] || []), optimisticMessage],
+        }))
+      }
+
       let chatId = message.chatId
 
       // Для контактов получаем или создаем чат
@@ -723,13 +740,14 @@ export default function Home() {
       }
 
       if (chatId) {
-        console.log("💾 Saving message to database:", message.text)
+        // Сохраняем в БД (в фоне)
         await messageService.sendMessage(chatId, user.id, message.text || "", "text")
-        console.log("✅ Message saved successfully")
       }
 
     } catch (error: any) {
       console.error("❌ Error sending message:", error)
+      // Удаляем optimistic message при ошибке
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith('temp_')))
       alert("Ошибка отправки сообщения. Попробуйте еще раз.")
     }
   }
@@ -737,8 +755,14 @@ export default function Home() {
   const loadMessages = async () => {
     if (!selectedChat || !user.id) return
 
-    // Сначала очищаем сообщения и показываем индикатор загрузки
-    setMessages([])
+    // КЕШИРОВАНИЕ: проверяем кеш перед загрузкой
+    if (messagesCache[selectedChat]) {
+      setMessages(messagesCache[selectedChat])
+      setIsLoading(false)
+      return
+    }
+
+    // Показываем индикатор только если нет кеша
     setIsLoading(true)
 
     try {
@@ -753,7 +777,6 @@ export default function Home() {
       }
 
       if (actualChatId) {
-        console.log("📥 Loading messages for chat:", actualChatId)
         const messagesData = await messageService.getMessages(actualChatId, user.id)
 
         // Проверяем, что данные не пустые и имеют правильный формат
@@ -772,18 +795,25 @@ export default function Home() {
           }))
 
           setMessages(formattedMessages)
-          console.log("✅ Messages loaded:", formattedMessages.length)
+          // Сохраняем в кеш
+          setMessagesCache((prev) => ({
+            ...prev,
+            [selectedChat]: formattedMessages,
+          }))
+          console.log("✅ Messages loaded and cached:", formattedMessages.length)
         } else {
           // Если сообщений нет, показываем пустой чат
-          console.log("ℹ️ No messages found for this chat")
           setMessages([])
+          setMessagesCache((prev) => ({
+            ...prev,
+            [selectedChat]: [],
+          }))
         }
       } else {
         setMessages([])
       }
     } catch (error) {
       console.error("❌ Error loading messages:", error)
-      // При ошибке показываем пустой чат
       setMessages([])
     } finally {
       setIsLoading(false)
@@ -915,29 +945,40 @@ export default function Home() {
             console.log("🔔 Notification shown and unread count increased for chat:", uiChatId)
           }
 
+          // Создаем объект сообщения
+          const newMessage = {
+            id: messageData.id,
+            text: messageData.content || "",
+            timestamp: new Date(messageData.created_at),
+            isOwn: messageData.sender_id === user.id,
+            sender: messageData.sender?.name || "Unknown",
+            senderAvatar: messageData.sender?.avatar || "/placeholder.svg?height=32&width=32",
+            senderLogin: messageData.sender?.login || "unknown",
+            chatId: uiChatId,
+          }
+
+          // Обновляем кеш для этого чата
+          setMessagesCache((prevCache) => {
+            const chatMessages = prevCache[uiChatId] || []
+            if (chatMessages.find((m) => m.id === newMessage.id)) {
+              return prevCache
+            }
+            return {
+              ...prevCache,
+              [uiChatId]: [...chatMessages, newMessage],
+            }
+          })
+
           // Если это текущий открытый чат - добавляем сообщение в список
           if (currentSelectedChat === uiChatId) {
-            const newMessage = {
-              id: messageData.id,
-              text: messageData.content || "",
-              timestamp: new Date(messageData.created_at),
-              isOwn: messageData.sender_id === user.id,
-              sender: messageData.sender?.name || "Unknown",
-              senderAvatar: messageData.sender?.avatar || "/placeholder.svg?height=32&width=32",
-              senderLogin: messageData.sender?.login || "unknown",
-              chatId: uiChatId,
-            }
-
             setMessages((prevMessages) => {
-              if (prevMessages.find((m) => m.id === newMessage.id)) {
-                console.log("⏭️ Message already exists in current chat, skipping")
-                return prevMessages
+              // Заменяем temp сообщение на реальное или добавляем новое
+              const withoutTemp = prevMessages.filter((m) => !m.id.startsWith('temp_'))
+              if (withoutTemp.find((m) => m.id === newMessage.id)) {
+                return withoutTemp
               }
-              console.log("✅ Adding new message to current chat UI:", newMessage.text)
-              return [...prevMessages, newMessage]
+              return [...withoutTemp, newMessage]
             })
-          } else {
-            console.log("📝 Updated last message for different chat, not adding to UI")
           }
         }
       )
