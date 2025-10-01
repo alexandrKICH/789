@@ -98,7 +98,62 @@ Preferred communication style: Simple, everyday language.
 - **Embla Carousel**: Carousel component.
 - **Immer**: For immutable state updates.
 
+## Replit Environment Setup
+
+### Development Configuration
+- **Backend Workflow**: 
+  - Port: 3001
+  - Command: `cd backend && SUPABASE_URL=... SUPABASE_ANON_KEY=... FRONTEND_URL=... PORT=3001 npm run dev`
+  - Environment variables injected directly in workflow command
+  
+- **Frontend Workflow**: 
+  - Port: 5000 (required for Replit proxy)
+  - Command: `cd frontend && npm run dev`
+  - Next.js configured with `allowedHosts: true` for Replit iframe support
+  - Environment variables in `.env.local`
+
+### Performance Optimizations
+- **Message Caching**: Messages cached per chat to prevent repeated DB queries
+- **Optimistic Updates**: Messages appear instantly before server confirmation
+- **Real-time Sync**: Socket.IO and Supabase subscriptions update cache automatically
+- **Instant Loading**: Cached chats load immediately without loading indicators
+
+### Voice Message Fixes
+- **Audio Quality**: 48kHz sample rate, 128k bitrate, autoGainControl enabled
+- **Instant Playback**: Audio elements preload metadata, no page refresh needed
+- **Error Handling**: Robust validation for audio URLs and playback states
+
+### Deployment Configuration
+- **Target**: Autoscale deployment
+- **Build**: Builds both frontend and backend with TypeScript compilation
+- **Run**: Backend on port 3001, Frontend on port 5000, both processes in parallel
+- **Environment**: Supabase credentials passed via environment variables
+
 ## Recent Changes
+
+### October 1, 2025 - Replit Environment Setup & Performance Optimization
+- **Environment Configuration**:
+  - Set up Node.js development environment in Replit
+  - Configured Next.js to allow all hosts for Replit proxy support
+  - Created workflows for backend (port 3001) and frontend (port 5000)
+  - Fixed dotenv loading in backend by moving config before imports
+  
+- **Performance Optimization**:
+  - Implemented message caching system to prevent repeated DB queries
+  - Added optimistic UI updates for instant message display
+  - Removed loading indicators and delays for Telegram-like speed
+  - Integrated cache updates with real-time subscriptions
+  
+- **Voice Message Fixes**:
+  - Increased audio quality: 48kHz sample rate, 128k bitrate
+  - Enabled autoGainControl for better voice clarity
+  - Fixed playback to work without page refresh
+  - Added robust error handling for audio URLs
+  
+- **Deployment Setup**:
+  - Configured autoscale deployment for production
+  - Set up build pipeline for both frontend and backend
+  - Configured environment variable injection for Supabase
 
 ### September 30, 2025 - Backend/Frontend Separation
 - **Project Structure**: Разделен проект на backend/ и frontend/ директории
