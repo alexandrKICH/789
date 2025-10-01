@@ -54,7 +54,9 @@ export function VoiceRecorder({ onSave, onCancel }: VoiceRecorderProps) {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 44100,
+          sampleRate: 48000,
+          channelCount: 1,
+          autoGainControl: true,
         },
       })
 
@@ -63,16 +65,16 @@ export function VoiceRecorder({ onSave, onCancel }: VoiceRecorderProps) {
         return
       }
 
-      // Проверяем поддержку разных форматов
+      // Проверяем поддержку разных форматов с высоким битрейтом
       const options = [
-        { mimeType: "audio/webm;codecs=opus" },
-        { mimeType: "audio/webm" },
-        { mimeType: "audio/mp4" },
-        { mimeType: "audio/ogg;codecs=opus" },
+        { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 128000 },
+        { mimeType: "audio/webm", audioBitsPerSecond: 128000 },
+        { mimeType: "audio/mp4", audioBitsPerSecond: 128000 },
+        { mimeType: "audio/ogg;codecs=opus", audioBitsPerSecond: 128000 },
         { mimeType: "audio/wav" },
       ]
 
-      let selectedOptions = { mimeType: "audio/webm" }
+      let selectedOptions: any = { mimeType: "audio/webm", audioBitsPerSecond: 128000 }
       for (const option of options) {
         if (MediaRecorder.isTypeSupported(option.mimeType)) {
           selectedOptions = option
@@ -277,7 +279,12 @@ export function VoiceRecorder({ onSave, onCancel }: VoiceRecorderProps) {
               src={audioUrl}
               onEnded={() => setIsPlaying(false)}
               onError={() => setError("Ошибка воспроизведения")}
-              preload="none"
+              onLoadedMetadata={() => {
+                if (audioRef.current) {
+                  audioRef.current.volume = 1.0
+                }
+              }}
+              preload="metadata"
             />
           )}
         </div>

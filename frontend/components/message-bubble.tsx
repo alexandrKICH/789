@@ -28,7 +28,6 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
   const [audioError, setAudioError] = useState(false)
   const [videoError, setVideoError] = useState(false)
   const [imageError, setImageError] = useState(false)
-  const [audioLoaded, setAudioLoaded] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -63,38 +62,10 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
     if (!audioRef.current) return
 
     try {
-      // Если аудио еще не загружено, пытаемся загрузить
-      if (!audioLoaded && message.audio) {
-        if (!isValidMediaUrl(message.audio)) {
-          console.error("❌ Invalid audio URL:", message.audio)
-          setAudioError(true)
-          return
-        }
-        audioRef.current.src = message.audio
-
-        // Добавляем обработчики событий
-        audioRef.current.onloadedmetadata = () => {
-          setDuration(audioRef.current?.duration || 0)
-          setAudioLoaded(true)
-          setAudioError(false)
-        }
-
-        audioRef.current.ontimeupdate = () => {
-          setCurrentTime(audioRef.current?.currentTime || 0)
-        }
-
-        audioRef.current.onended = () => {
-          setIsPlaying(false)
-        }
-
-        audioRef.current.onerror = () => {
-          console.error("❌ Audio playback failed")
-          setAudioError(true)
-          setIsPlaying(false)
-        }
-
-        // Загружаем метаданные
-        audioRef.current.load()
+      if (!isValidMediaUrl(message.audio)) {
+        console.error("❌ Invalid audio URL:", message.audio)
+        setAudioError(true)
+        return
       }
 
       // Воспроизводим или ставим на паузу
@@ -286,8 +257,28 @@ export function MessageBubble({ message, showAvatar = true }: MessageBubbleProps
                 </div>
               </div>
 
-              {/* Аудио элемент без src - загружается только при клике */}
-              <audio ref={audioRef} preload="none" />
+              {/* Аудио элемент с preload для мгновенного воспроизведения */}
+              <audio 
+                ref={audioRef} 
+                src={message.audio || ''} 
+                preload="metadata"
+                onLoadedMetadata={() => {
+                  if (audioRef.current) {
+                    setDuration(audioRef.current.duration || 0)
+                    audioRef.current.volume = 1.0
+                  }
+                }}
+                onTimeUpdate={() => {
+                  if (audioRef.current) {
+                    setCurrentTime(audioRef.current.currentTime || 0)
+                  }
+                }}
+                onEnded={() => setIsPlaying(false)}
+                onError={() => {
+                  console.error("❌ Audio load failed")
+                  setAudioError(true)
+                }}
+              />
             </div>
           )}
 
